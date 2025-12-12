@@ -1,0 +1,28 @@
+# SQLPage application configuration for the User Directory app
+# See: https://sql.ophir.dev/docs/reference/configuration
+
+app:
+  # Display name in the navbar and HTML title
+  title: "User Directory"
+  description: "A simple SQLPage app backed by SQLite to browse users."
+  # Optional branding color
+  theme: "default"
+
+# Data sources used by the app
+datasources:
+  # Default SQLite datasource pointing to the existing database
+  default:
+    driver: "sqlite"
+    # Relative path from this sqlpage.yaml to the database file
+    datasource: "./database/myapp.db"
+
+# Path to the pages directory containing .sql pages
+pages:
+  path: "./pages"
+
+# Basic navigation
+navigation:
+  - title: "Home"
+    path: "/home.sql"
+  - title: "Users"
+    path: "/users.sql"
