@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Initialize SQLite database for database"""
+"""Initialize SQLite database for database
+
+This script creates the SQLite database and tables if they don't exist,
+writes connection helper files, and seeds initial data idempotently.
+It can be run multiple times without creating duplicate records.
+"""
 
 import sqlite3
 import os
@@ -30,6 +35,9 @@ else:
 conn = sqlite3.connect(DB_NAME)
 cursor = conn.cursor()
 
+# Ensure foreign keys are enabled
+cursor.execute("PRAGMA foreign_keys = ON")
+
 # Create initial schema
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS app_info (
@@ -40,7 +48,7 @@ cursor.execute("""
     )
 """)
 
-# Create a sample users table as an example
+# Create a users table with UNIQUE constraints to support idempotent seeding
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,15 +58,35 @@ cursor.execute("""
     )
 """)
 
-# Insert initial data
-cursor.execute("INSERT OR REPLACE INTO app_info (key, value) VALUES (?, ?)", 
-               ("project_name", "database"))
-cursor.execute("INSERT OR REPLACE INTO app_info (key, value) VALUES (?, ?)", 
-               ("version", "0.1.0"))
-cursor.execute("INSERT OR REPLACE INTO app_info (key, value) VALUES (?, ?)", 
-               ("author", "John Doe"))
-cursor.execute("INSERT OR REPLACE INTO app_info (key, value) VALUES (?, ?)", 
-               ("description", ""))
+# Insert/Upsert initial app_info data (idempotent)
+cursor.execute(
+    "INSERT OR REPLACE INTO app_info (key, value) VALUES (?, ?)",
+    ("project_name", "database"),
+)
+cursor.execute(
+    "INSERT OR REPLACE INTO app_info (key, value) VALUES (?, ?)",
+    ("version", "0.1.0"),
+)
+cursor.execute(
+    "INSERT OR REPLACE INTO app_info (key, value) VALUES (?, ?)",
+    ("author", "John Doe"),
+)
+cursor.execute(
+    "INSERT OR REPLACE INTO app_info (key, value) VALUES (?, ?)",
+    ("description", ""),
+)
+
+# Seed users idempotently:
+# Use INSERT OR IGNORE leveraging UNIQUE(username) and UNIQUE(email)
+seed_users = [
+    ("alice", "alice@example.com"),
+    ("bob", "bob@example.com"),
+]
+for username, email in seed_users:
+    cursor.execute(
+        "INSERT OR IGNORE INTO users (username, email) VALUES (?, ?)",
+        (username, email),
+    )
 
 conn.commit()
 
@@ -68,6 +96,10 @@ table_count = cursor.fetchone()[0]
 
 cursor.execute("SELECT COUNT(*) FROM app_info")
 record_count = cursor.fetchone()[0]
+
+# Count users to show seeding status
+cursor.execute("SELECT COUNT(*) FROM users")
+users_count = cursor.fetchone()[0]
 
 conn.close()
 
@@ -116,6 +148,7 @@ print("")
 print("Database statistics:")
 print(f"  Tables: {table_count}")
 print(f"  App info records: {record_count}")
+print(f"  Users: {users_count}")
 
 # If sqlite3 CLI is available, show how to use it
 try:
@@ -125,7 +158,7 @@ try:
         print("")
         print("SQLite CLI is available. You can also use:")
         print(f"  sqlite3 {DB_NAME}")
-except:
+except Exception:
     pass
 
 # Exit successfully
